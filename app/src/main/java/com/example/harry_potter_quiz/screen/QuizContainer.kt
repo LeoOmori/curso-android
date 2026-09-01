@@ -20,6 +20,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,11 +35,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.harry_potter_quiz.R
+import com.example.harry_potter_quiz.helper.RetroFitInstance
+import com.example.harry_potter_quiz.model.Personagem
 import com.example.harry_potter_quiz.ui.theme.HarrypotterquizTheme
 
-
-enum class House(value: String) {
+enum class House(val displayName: String) {
     GRYFFINDOR("Grifinória"),
     SLYTHERIN ("Sonserina"),
     RAVENCLAW ("Corvinal"),
@@ -44,8 +51,40 @@ enum class House(value: String) {
 @Composable
 fun QuizContainer(
     modifier: Modifier = Modifier,
-    onShowResult: () -> Unit = {}
+    onShowResult: (rightRounds: Int, totalRounds: Int) -> Unit = { _, _ -> }
 ) {
+    val totalRounds = 5
+    var rightRounds by remember { mutableStateOf(0) }
+    var currentRound by remember { mutableStateOf(1) }
+    var character by remember { mutableStateOf<Personagem?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentRound) {
+        isLoading = true
+        character = try {
+            RetroFitInstance.api.getCharacter(index = (0..24).random())
+        } catch (e: Exception) {
+            println(e)
+            null
+        }
+        isLoading = false
+    }
+
+    fun nextRound(value: House) {
+        val updatedRightRounds = if (character?.getHouse() == value) {
+            rightRounds + 1
+        } else {
+            rightRounds
+        }
+
+        rightRounds = updatedRightRounds
+
+        if (currentRound < totalRounds) {
+            currentRound++
+        } else {
+            onShowResult(updatedRightRounds, totalRounds)
+        }
+    }
 
     Box(
         modifier = modifier
@@ -69,7 +108,7 @@ fun QuizContainer(
                     fontWeight = FontWeight.Bold,
                     )
                 Text(
-                    text = "Rodada 4/10",
+                    text = "Rodada $currentRound/$totalRounds",
                     textAlign = TextAlign.Right,
                     color = Color.White,
                     fontSize = 14.sp,
@@ -79,17 +118,26 @@ fun QuizContainer(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            Image(
-                modifier = Modifier.size(width = 180.dp, height = 260.dp),
-                painter = painterResource(id = R.drawable.image),
-                contentDescription = "Imagem do personagem",
-                contentScale = ContentScale.Crop
-            )
+            if (character?.image?.isNotBlank() == true) {
+                AsyncImage(
+                    modifier = Modifier.size(width = 180.dp, height = 260.dp),
+                    model = character?.image,
+                    contentDescription = "Imagem do personagem",
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    modifier = Modifier.size(width = 180.dp, height = 260.dp),
+                    painter = painterResource(id = R.drawable.image),
+                    contentDescription = "Imagem do personagem",
+                    contentScale = ContentScale.Crop
+                )
+            }
 
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "Harry Potter",
+                text = character?.fullName ?: "Carregando...",
                 color = Color.White,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
@@ -106,7 +154,11 @@ fun QuizContainer(
             Spacer(modifier = Modifier.height(85.dp))
 
             for (value in House.entries) {
-                CasaBotao(value = value, onShowResult)
+                CasaBotao(
+                    value = value,
+                    enabled = !isLoading && character != null,
+                    onClick = { nextRound(value) }
+                )
                 Spacer(modifier = Modifier.height(15.dp))
             }
 
@@ -116,9 +168,10 @@ fun QuizContainer(
 }
 
 @Composable
-fun CasaBotao(value: House, onShowResult: () -> Unit) {
+fun CasaBotao(value: House, enabled: Boolean = true, onClick: () -> Unit) {
     Button(
-        onClick = {onShowResult()},
+        onClick = onClick,
+        enabled = enabled,
         colors = ButtonDefaults.buttonColors(
             containerColor = Color(0xFF171E25)
         ),
@@ -148,7 +201,7 @@ fun CasaBotao(value: House, onShowResult: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     fontSize = 15.sp,
-                    text = value.toString(),
+                    text = value.displayName,
                 )
 
             }

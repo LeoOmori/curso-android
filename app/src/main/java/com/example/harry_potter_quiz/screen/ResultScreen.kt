@@ -24,6 +24,8 @@ import com.example.harry_potter_quiz.ui.theme.HarrypotterquizTheme
 @Composable
 fun ResultScreen(
     modifier: Modifier = Modifier,
+    rightRounds: Int = 0,
+    totalRounds: Int = 5,
     onRestartQuiz: () -> Unit = {}
 ) {
     Box(
@@ -52,7 +54,7 @@ fun ResultScreen(
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "8/10",
+                text = "$rightRounds/$totalRounds",
                 color = Color(0xFFCCCC4A),
                 fontSize = 68.sp,
                 fontWeight = FontWeight.Bold,
