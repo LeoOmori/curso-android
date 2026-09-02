@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curso Android · Hogwarts Quiz</title>
+
+<!-- ===========================================
+     FONTES (Fontshare + Google Fonts, nunca system fonts)
+     Cabinet Grotesk -> títulos · Supreme -> corpo · JetBrains Mono -> código/etiquetas
+     =========================================== -->
+<link rel="preconnect" href="https://api.fontshare.com">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@500,700,800&f[]=supreme@400,500,700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+
+<style>
+/* ===========================================
+   TEMA — mude estas variáveis para mudar tudo
+   Estética: editor de código, fundo carvão, verde Android de acento.
+   =========================================== */
+:root{
+    --stage-bg:#07090d;
+    --slide-bg:#0e1116;
+    --panel:#151a21;
+    --panel-2:#1b222c;
+    --line:#263041;
+
+    --text:#e9eef5;
+    --text-dim:#95a1b2;
+    --text-faint:#5b6675;
+
+    --accent:#3ddc84;          /* verde Android */
+    --accent-ink:#04140b;
+    --blue:#7ab7ff;
+    --wand:#d9a441;            /* dourado discreto — aceno a Hogwarts */
+
+    --c-key:#f97583;
+    --c-type:#79c0ff;
+    --c-fn:#d2a8ff;
+    --c-str:#e3b341;
+    --c-num:#79c0ff;
+    --c-com:#6e7681;
+
+    --font-display:'Cabinet Grotesk','Supreme',sans-serif;
+    --font-body:'Supreme',sans-serif;
+    --font-mono:'JetBrains Mono',ui-monospace,monospace;
+
+    --ease:cubic-bezier(0.16,1,0.3,1);
+    --dur:.6s;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+
+/* ===========================================
+   FIXED 16:9 STAGE — viewport-base.css (íntegro)
+   =========================================== */
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--stage-bg,#000);}
+.deck-viewport{position:fixed;inset:0;overflow:hidden;background:var(--stage-bg,#000);}
+.deck-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;overflow:hidden;transform-origin:0 0;background:var(--slide-bg,#fff);}
+.slide{position:absolute;inset:0;width:1920px;height:1080px;overflow:hidden;display:block;visibility:hidden;opacity:0;pointer-events:none;background:var(--slide-bg,#fff);}
+.slide.active,.slide.visible{visibility:visible;opacity:1;pointer-events:auto;z-index:1;}
+img,video,canvas,svg{max-width:100%;max-height:100%;}
+.deck-controls{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:1000;}
+@media print{
+    html,body{width:1920px;height:auto;overflow:visible;background:#fff;}
+    .deck-viewport{position:static;overflow:visible;background:#fff;}
+    .deck-stage{position:static;width:auto;height:auto;transform:none !important;background:none;}
+    .slide{position:relative;display:block !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;width:1920px;height:1080px;break-after:page;page-break-after:always;}
+    .slide:last-child{break-after:auto;page-break-after:auto;}
+    .deck-controls{display:none !important;}
+}
+@media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.2s !important;}
+}
+
+/* ===========================================
+   ATMOSFERA — grade sutil + brilho de acento
+   =========================================== */
+.slide{
+    background:
+        radial-gradient(1200px 700px at 82% -10%, rgba(61,220,132,.10) 0%, transparent 60%),
+        radial-gradient(900px 600px at -8% 110%, rgba(122,183,255,.08) 0%, transparent 60%),
+        var(--slide-bg);
+    color:var(--text);font-family:var(--font-body);
+}
+.slide::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:
+        linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+    background-size:64px 64px;
+    mask-image:linear-gradient(180deg,rgba(0,0,0,.9),rgba(0,0,0,.35));
+}
+
+.pad{position:absolute;inset:0;padding:96px 120px;display:flex;flex-direction:column;}
+.pad.center{justify-content:center;}
+.pad.center .two,.pad.center .cards{flex:0 0 auto;}
+
+/* ===========================================
+   TIPOGRAFIA / COMPONENTES
+   =========================================== */
+.eyebrow{
+    font-family:var(--font-mono);font-size:20px;letter-spacing:.28em;text-transform:uppercase;
+    color:var(--accent);display:flex;align-items:center;gap:16px;
+}
+.eyebrow::before{content:"";width:38px;height:2px;background:var(--accent);display:inline-block;}
+
+h1.headline{font-family:var(--font-display);font-weight:800;font-size:118px;line-height:.98;letter-spacing:-.02em;}
+h2.headline{font-family:var(--font-display);font-weight:700;font-size:74px;line-height:1.03;letter-spacing:-.015em;margin-top:26px;}
+.lead{font-size:32px;line-height:1.45;color:var(--text-dim);max-width:1200px;}
+.headline + .lead{margin-top:22px;}
+.accent{color:var(--accent);} .blue{color:var(--blue);} .wand{color:var(--wand);}
+
+ul.points{list-style:none;display:flex;flex-direction:column;gap:24px;margin-top:40px;}
+ul.points li{position:relative;padding-left:44px;font-size:31px;line-height:1.4;color:var(--text);max-width:1180px;}
+ul.points li::before{content:"";position:absolute;left:0;top:.55em;width:14px;height:14px;border:2px solid var(--accent);border-radius:3px;transform:rotate(45deg);}
+ul.points li b{color:#fff;font-weight:700;}
+ul.points li .muted{color:var(--text-dim);}
+
+/* bloco de código (exemplos genéricos de sintaxe, não do app) */
+.editor{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 40px 90px -40px rgba(0,0,0,.7);}
+.editor-bar{display:flex;align-items:center;gap:10px;padding:16px 22px;background:var(--panel-2);border-bottom:1px solid var(--line);}
+.dot{width:13px;height:13px;border-radius:50%;display:inline-block;}
+.dot-r{background:#e2445c;} .dot-y{background:var(--wand);} .dot-g{background:var(--accent);}
+.editor-file{font-family:var(--font-mono);font-size:18px;color:var(--text-dim);margin-left:14px;}
+pre.code{font-family:var(--font-mono);font-size:24px;line-height:1.65;padding:30px 36px;color:#c9d3e0;overflow:hidden;white-space:pre;}
+pre.code.sm{font-size:21px;line-height:1.62;}
+.k{color:var(--c-key);} .t{color:var(--c-type);} .fn{color:var(--c-fn);}
+.s{color:var(--c-str);} .num{color:var(--c-num);} .c{color:var(--c-com);font-style:italic;}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;flex:0 0 auto;margin-top:40px;}
+.two.wide-left{grid-template-columns:1.05fr .95fr;}
+.two.wide-right{grid-template-columns:.9fr 1.1fr;}
+
+.cards{display:grid;gap:26px;margin-top:44px;flex:0 0 auto;}
+.cards.c2{grid-template-columns:1fr 1fr;}
+.cards.c3{grid-template-columns:repeat(3,1fr);}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:32px 34px;display:flex;flex-direction:column;gap:14px;}
+.card .tag{font-family:var(--font-mono);font-size:17px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+.card h3{font-family:var(--font-display);font-weight:700;font-size:31px;color:#fff;}
+.card p{font-size:23px;line-height:1.45;color:var(--text-dim);}
+
+.chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:16px;}
+.chips span{font-family:var(--font-mono);font-size:22px;padding:14px 22px;border-radius:10px;border:1px solid var(--line);color:var(--text-dim);background:var(--panel);}
+
+.foot{
+    position:absolute;left:120px;right:120px;bottom:56px;display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--font-mono);font-size:18px;color:var(--text-faint);border-top:1px solid var(--line);padding-top:22px;
+}
+
+/* diagrama em camadas */
+.stack{display:flex;flex-direction:column;gap:12px;margin-top:44px;max-width:1320px;}
+.layer{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 30px;font-size:25px;display:flex;justify-content:space-between;align-items:center;}
+.layer .lbl{font-family:var(--font-mono);font-size:17px;color:var(--text-faint);}
+.layer.hi{border-color:var(--accent);background:linear-gradient(90deg,rgba(61,220,132,.12),transparent);}
+
+/* fluxo horizontal */
+.flow{display:flex;flex-wrap:wrap;gap:14px 10px;align-items:center;margin-top:40px;}
+.node{display:inline-block;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 24px;font-size:24px;}
+.vflow{display:flex;flex-direction:column;align-items:flex-start;gap:14px;font-family:var(--font-mono);}
+.vflow .step{color:var(--text-faint);font-size:20px;padding-left:20px;}
+.node.acc{border-color:var(--accent);color:var(--accent);}
+.node.api{border-color:var(--blue);color:var(--blue);}
+.arrow{color:var(--text-faint);font-size:28px;}
+
+/* slide de frase-impacto */
+.statement .pad{justify-content:center;}
+.statement .big{font-family:var(--font-display);font-weight:800;font-size:104px;line-height:1.02;letter-spacing:-.02em;max-width:1500px;}
+.statement .sub{font-size:34px;color:var(--text-dim);margin-top:38px;max-width:1200px;line-height:1.4;}
+
+/* abertura */
+.title-slide .pad{justify-content:center;}
+.title-slide h1{max-width:1500px;}
+.title-badges{display:flex;gap:14px;margin-top:44px;flex-wrap:wrap;}
+.badge{font-family:var(--font-mono);font-size:22px;padding:12px 20px;border-radius:999px;border:1px solid var(--line);color:var(--text-dim);background:var(--panel);}
+.badge.on{border-color:var(--accent);color:var(--accent);}
+.title-sub{font-size:34px;color:var(--text-dim);margin-top:40px;max-width:1200px;line-height:1.4;}
+
+/* slide de seção */
+.section-slide .pad{justify-content:center;}
+.section-slide .big{font-family:var(--font-display);font-weight:800;font-size:150px;line-height:.95;letter-spacing:-.02em;}
+.section-slide .day{font-family:var(--font-mono);font-size:26px;letter-spacing:.3em;color:var(--accent);text-transform:uppercase;}
+.section-slide .chips{margin-top:52px;max-width:1400px;}
+
+/* mockup de celular */
+.phone{
+    width:392px;height:720px;border-radius:46px;border:2px solid var(--line);background:#0d0f16;
+    padding:22px 20px;display:flex;flex-direction:column;align-items:center;
+    box-shadow:0 60px 120px -50px rgba(0,0,0,.8), 0 0 0 11px #0b0d12;margin:0 auto;
+}
+.phone .bar{width:100%;display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:14px;}
+.phone .bar .l{color:var(--wand);font-weight:700;} .phone .bar .r{color:#fff;}
+.phone .portrait{width:150px;height:200px;border-radius:8px;margin:28px 0 20px;background:linear-gradient(160deg,#2a3550,#151a2b);display:flex;align-items:center;justify-content:center;color:var(--text-faint);font-size:40px;}
+.phone .name{color:#fff;font-family:var(--font-display);font-weight:700;font-size:24px;}
+.phone .q{color:var(--text-faint);font-size:15px;margin-top:5px;}
+.phone .houses{width:100%;margin-top:22px;display:flex;flex-direction:column;gap:11px;}
+.phone .house{border:1px solid #3f475e;border-radius:14px;background:#171e25;padding:12px 16px;display:flex;align-items:center;gap:11px;font-size:15px;color:#e9eef5;}
+.phone .house i{width:11px;height:11px;border-radius:50%;display:inline-block;}
+
+/* animações de entrada — disparadas por .visible */
+.reveal{opacity:0;transform:translateY(30px);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);}
+.slide.visible .reveal{opacity:1;transform:none;}
+/* em impressão/export de PDF nada fica escondido pela animação */
+@media print{.reveal{opacity:1 !important;transform:none !important;}}
+.d1{transition-delay:.06s}.d2{transition-delay:.14s}.d3{transition-delay:.22s}
+.d4{transition-delay:.3s}.d5{transition-delay:.38s}.d6{transition-delay:.46s}.d7{transition-delay:.54s}
+
+/* edição inline */
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:10000;cursor:pointer;}
+.edit-toggle{position:fixed;top:18px;left:18px;z-index:10001;background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;font-size:18px;padding:8px 12px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .3s ease;}
+.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto;}
+body.editing [contenteditable]{outline:1px dashed var(--accent);outline-offset:4px;border-radius:3px;}
+body.editing [contenteditable]:focus{outline:2px solid var(--accent);background:rgba(61,220,132,.06);}
+.edit-save{position:fixed;top:18px;left:120px;z-index:10001;display:none;background:var(--accent);color:var(--accent-ink);border:none;border-radius:10px;font-family:var(--font-mono);font-size:14px;padding:10px 14px;cursor:pointer;font-weight:700;}
+body.editing .edit-save{display:block;}
+</style>
+</head>
+<body>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+    <!-- ========== 01 · ABERTURA ========== -->
+    <section class="slide title-slide active">
+        <div class="pad">
+            <div class="eyebrow reveal d1">mini-curso · 2 dias · 1h por aula</div>
+            <h1 class="headline reveal d2">Introdução ao<br>Desenvolvimento <span class="accent">Android</span></h1>
+            <p class="title-sub reveal d3"><b>Dia 1</b> — montar a tela. &nbsp;<b>Dia 2</b> — dar vida a ela.<br>No fim, construímos juntos o <span class="wand">Hogwarts Quiz</span>.</p>
+            <div class="title-badges reveal d4">
+                <span class="badge on">Kotlin</span>
+                <span class="badge on">Jetpack Compose</span>
+                <span class="badge">Android Studio</span>
+            </div>
+        </div>
+        <div class="foot"><span>Hogwarts Quiz</span><span>2026</span></div>
+    </section>
+
+    <!-- ========== 02 · O QUE VAMOS CONSTRUIR ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">o projeto</div>
+            <h2 class="headline reveal d2">O que vamos construir</h2>
+            <div class="two wide-right">
+                <ul class="points">
+                    <li class="reveal d3">Aparece um <b>personagem</b> — você adivinha a <b>casa de Hogwarts</b>.</li>
+                    <li class="reveal d4"><b>5 rodadas</b>, cada uma com um personagem vindo da internet.</li>
+                    <li class="reveal d5">No fim, uma <b>tela de resultado</b> com o placar.</li>
+                    <li class="reveal d6">Só <b>duas telas</b> — o suficiente pra ver tudo funcionando junto.</li>
+                </ul>
+                <div class="reveal d4">
+                    <div class="phone">
+                        <div class="bar"><span class="l">Hogwarts Quiz</span><span class="r">Rodada 3/5</span></div>
+                        <div class="portrait">🧙</div>
+                        <div class="name">Hermione Granger</div>
+                        <div class="q">Qual é a sua casa?</div>
+                        <div class="houses">
+                            <div class="house"><i style="background:#e2445c"></i>Grifinória</div>
+                            <div class="house"><i style="background:#3ddc84"></i>Sonserina</div>
+                            <div class="house"><i style="background:#7ab7ff"></i>Corvinal</div>
+                            <div class="house"><i style="background:#d9a441"></i>Lufa Lufa</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Hogwarts Quiz</span><span>02</span></div>
+    </section>
+
+    <!-- ========== 03 · COMO O CURSO FUNCIONA ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">roteiro</div>
+            <h2 class="headline reveal d2">Como o curso funciona</h2>
+            <div class="two">
+                <div class="card reveal d3" style="gap:18px;">
+                    <span class="tag">dia 1 · a tela</span>
+                    <h3>Montar a interface</h3>
+                    <p>Como o Android funciona · Kotlin para ler código · o que é o Compose · UI declarativa · <b>@Composable</b> e os blocos · <b>Modifier</b> · tema e cores.</p>
+                </div>
+                <div class="card reveal d4" style="gap:18px;border-color:var(--accent);">
+                    <span class="tag">dia 2 · a lógica</span>
+                    <h3>Dar vida à tela</h3>
+                    <p>Estado e recomposição · reagir a cliques · buscar dados da internet · navegar entre telas · montar o quiz inteiro.</p>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Hogwarts Quiz</span><span>03</span></div>
+    </section>
+
+    <!-- ========== 04 · SEÇÃO DIA 1 ========== -->
+    <section class="slide section-slide">
+        <div class="pad">
+            <div class="day reveal d1">Dia 1</div>
+            <div class="big reveal d2">Montando<br>a <span class="accent">tela</span></div>
+            <div class="chips reveal d4">
+                <span>o que é o Android</span>
+                <span>o que é um app</span>
+                <span>Kotlin essencial</span>
+                <span>UI declarativa</span>
+                <span>@Composable</span>
+                <span>blocos: Column, Row, Box…</span>
+                <span>Modifier</span>
+                <span>tema &amp; cores</span>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>04</span></div>
+    </section>
+
+    <!-- ========== 05 · O QUE É O ANDROID ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 1 · plataforma</div>
+            <h2 class="headline reveal d2">O que é o Android</h2>
+            <p class="lead reveal d3">Um sistema operacional sobre um kernel <b>Linux</b>. Cada app roda <b>isolado</b>, no seu próprio espaço. A gente programa na <b>camada de cima</b>, com Kotlin.</p>
+            <div class="stack">
+                <div class="layer hi reveal d3"><span>Seu app — Hogwarts Quiz</span><span class="lbl">Kotlin + Compose</span></div>
+                <div class="layer reveal d4"><span>APIs do Android</span><span class="lbl">telas, sensores, rede</span></div>
+                <div class="layer reveal d5"><span>Bibliotecas do sistema</span><span class="lbl">gráficos, mídia</span></div>
+                <div class="layer reveal d6"><span>Kernel Linux</span><span class="lbl">memória, energia, drivers</span></div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>05</span></div>
+    </section>
+
+    <!-- ========== 06 · O QUE É UM APP ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 1 · ferramentas</div>
+            <h2 class="headline reveal d2">O que é um app Android</h2>
+            <div class="cards c3">
+                <div class="card reveal d3">
+                    <span class="tag">Activity</span>
+                    <h3>A porta de entrada</h3>
+                    <p>Uma "tela" inicial. O app começa numa Activity e desenha toda a interface dentro dela.</p>
+                </div>
+                <div class="card reveal d4">
+                    <span class="tag">Android Studio</span>
+                    <h3>Onde a gente trabalha</h3>
+                    <p>O programa onde escrevemos, rodamos e testamos o app — com um emulador de celular embutido.</p>
+                </div>
+                <div class="card reveal d5">
+                    <span class="tag">Gradle</span>
+                    <h3>O montador</h3>
+                    <p>Junta o código, baixa as bibliotecas (Compose, etc.) e gera o app instalável.</p>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>06</span></div>
+    </section>
+
+    <!-- ========== 07 · KOTLIN EM UM SLIDE ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">dia 1 · linguagem</div>
+            <h2 class="headline reveal d2">Kotlin, em um slide</h2>
+            <p class="lead reveal d3">A linguagem do Android hoje. Você não precisa dominar — só <b>reconhecer o básico</b> pra acompanhar.</p>
+            <div class="two wide-right">
+                <ul class="points" style="margin-top:0;gap:20px;">
+                    <li class="reveal d3"><b>val</b> não muda · <b>var</b> muda</li>
+                    <li class="reveal d4"><b>fun</b> declara uma função</li>
+                    <li class="reveal d5"><span class="muted">String?</span> pode ser nulo · <span class="muted">?:</span> dá um valor padrão</li>
+                    <li class="reveal d6"><span class="muted">$nome</span> insere um valor dentro do texto</li>
+                </ul>
+                <div class="editor reveal d4">
+                    <div class="editor-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="editor-file">exemplo</span></div>
+<pre class="code sm"><span class="k">val</span> nome = <span class="s">"Harry"</span>        <span class="c">// texto, não muda</span>
+<span class="k">var</span> pontos = <span class="num">0</span>           <span class="c">// número, pode mudar</span>
+
+<span class="k">fun</span> <span class="fn">saudacao</span>(n: <span class="t">String</span>) = <span class="s">"Olá, </span>$n<span class="s">"</span>
+
+<span class="k">val</span> casa: <span class="t">String</span>? = <span class="k">null</span>
+<span class="fn">println</span>(casa <span class="k">?:</span> <span class="s">"Sem casa ainda"</span>)</pre>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>07</span></div>
+    </section>
+
+    <!-- ========== 08 · UI DECLARATIVA ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 1 · o modelo mental</div>
+            <h2 class="headline reveal d2">Jetpack Compose: UI declarativa</h2>
+            <div class="two">
+                <div class="card reveal d3" style="gap:16px;">
+                    <span class="tag">o jeito antigo</span>
+                    <p style="font-size:24px;">Você monta a tela em arquivos separados e <b>atualiza cada pedaço na mão</b> quando algo muda. Fácil esquecer um caso.</p>
+                </div>
+                <div class="card reveal d4" style="gap:16px;border-color:var(--accent);">
+                    <span class="tag">com o compose</span>
+                    <p style="font-size:24px;">Você <b>descreve</b> como a tela deve ser para um <b>estado</b>. Mudou o estado, o Compose redesenha o que for preciso.</p>
+                </div>
+            </div>
+            <div class="reveal d5" style="margin-top:48px;font-family:var(--font-mono);font-size:46px;text-align:center;">
+                <span class="accent">tela</span> = f( <span class="blue">estado</span> )
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>08</span></div>
+    </section>
+
+    <!-- ========== 09 · @COMPOSABLE E OS BLOCOS ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">dia 1 · blocos de UI</div>
+            <h2 class="headline reveal d2">A função <span class="accent">@Composable</span></h2>
+            <p class="lead reveal d3">No Compose, a tela é feita de <b>funções</b>. Uma função <b>@Composable</b> desenha um pedaço da interface — e pode usar outras dentro dela.</p>
+            <div class="two wide-right">
+                <div class="chips reveal d3" style="margin-top:8px;max-width:560px;">
+                    <span>Text — texto</span>
+                    <span>Column — empilha</span>
+                    <span>Row — lado a lado</span>
+                    <span>Box — sobrepõe</span>
+                    <span>Button — botão</span>
+                    <span>Image — imagem</span>
+                    <span>Spacer — espaço</span>
+                </div>
+                <div class="editor reveal d4">
+                    <div class="editor-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="editor-file">exemplo</span></div>
+<pre class="code sm"><span class="fn">@Composable</span>
+<span class="k">fun</span> <span class="fn">Saudacao</span>() {
+    <span class="fn">Column</span> {
+        <span class="fn">Text</span>(<span class="s">"Bem-vindo a Hogwarts"</span>)
+        <span class="fn">Button</span>(onClick = { }) {
+            <span class="fn">Text</span>(<span class="s">"Começar"</span>)
+        }
+    }
+}</pre>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>09</span></div>
+    </section>
+
+    <!-- ========== 10 · MODIFIER ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 1 · ajuste fino</div>
+            <h2 class="headline reveal d2"><span class="accent">Modifier</span></h2>
+            <p class="lead reveal d3">Todo bloco aceita um <b>Modifier</b>: tamanho, espaçamento, cor de fundo, borda, clique. É <b>encadeado</b> — e a <b>ordem importa</b>.</p>
+            <div class="editor reveal d4" style="margin-top:40px;max-width:1200px;">
+                <div class="editor-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="editor-file">exemplo</span></div>
+<pre class="code sm"><span class="fn">Text</span>(
+    <span class="s">"Grifinória"</span>,
+    modifier = <span class="t">Modifier</span>
+        .<span class="fn">fillMaxWidth</span>()          <span class="c">// ocupa a largura</span>
+        .<span class="fn">background</span>(<span class="t">Color</span>.<span class="t">Red</span>)   <span class="c">// pinta o fundo</span>
+        .<span class="fn">padding</span>(<span class="num">16</span>.dp)         <span class="c">// respiro por dentro</span>
+)</pre>
+            </div>
+            <p class="lead reveal d5" style="font-size:26px;margin-top:24px;">Trocar a ordem de <span class="blue">background</span> e <span class="blue">padding</span> muda o resultado na tela.</p>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>10</span></div>
+    </section>
+
+    <!-- ========== 11 · TEMA, CORES E PREVIEW ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 1 · identidade visual</div>
+            <h2 class="headline reveal d2">Tema, cores e <span class="accent">@Preview</span></h2>
+            <div class="cards c3">
+                <div class="card reveal d3">
+                    <span class="tag">tema central</span>
+                    <h3>Um lugar só</h3>
+                    <p>Cores, tipografia e formas ficam num tema. A tela inteira puxa dali — muda num ponto, muda em tudo.</p>
+                </div>
+                <div class="card reveal d4">
+                    <span class="tag">@Preview</span>
+                    <h3>Ver na hora</h3>
+                    <p>Desenha a função direto no Android Studio, sem abrir o app no emulador.</p>
+                </div>
+                <div class="card reveal d5">
+                    <span class="tag">iteração</span>
+                    <h3>Ajuste rápido</h3>
+                    <p>Mexeu no código, o preview atualiza. Dá pra afinar o visual em segundos.</p>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>11</span></div>
+    </section>
+
+    <!-- ========== 12 · FIM DO DIA 1 ========== -->
+    <section class="slide statement">
+        <div class="pad">
+            <div class="eyebrow reveal d1">fim do dia 1</div>
+            <div class="big reveal d2">Agora você consegue<br>montar <span class="accent">qualquer tela</span> estática.</div>
+            <p class="sub reveal d4">As telas do quiz e de resultado já existem no papel — só não fazem nada ainda. É o que resolvemos amanhã.</p>
+        </div>
+        <div class="foot"><span>Dia 1 — Montando a tela</span><span>12</span></div>
+    </section>
+
+    <!-- ========== 13 · SEÇÃO DIA 2 ========== -->
+    <section class="slide section-slide">
+        <div class="pad">
+            <div class="day reveal d1">Dia 2</div>
+            <div class="big reveal d2">Dando <span class="accent">vida</span><br>à tela</div>
+            <div class="chips reveal d4">
+                <span>estado &amp; recomposição</span>
+                <span>reagir a cliques</span>
+                <span>dados da internet</span>
+                <span>API REST · JSON</span>
+                <span>navegação entre telas</span>
+                <span>o quiz inteiro</span>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 2 — Dando vida à tela</span><span>13</span></div>
+    </section>
+
+    <!-- ========== 14 · ESTADO E RECOMPOSIÇÃO ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">dia 2 · o coração do compose</div>
+            <h2 class="headline reveal d2">Estado &amp; recomposição</h2>
+            <p class="lead reveal d3"><b>Estado</b> é a informação que muda enquanto o app roda: a rodada atual, o placar, o personagem da vez.</p>
+            <div class="two wide-right">
+                <ul class="points" style="margin-top:0;">
+                    <li class="reveal d4"><b>remember { mutableStateOf(...) }</b> guarda o valor entre redesenhos.</li>
+                    <li class="reveal d5">Mudou o estado → o Compose <b>recompõe</b> só o que usa aquele valor.</li>
+                </ul>
+                <div class="editor reveal d4">
+                    <div class="editor-bar"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span><span class="editor-file">exemplo</span></div>
+<pre class="code sm"><span class="k">var</span> cliques <span class="k">by</span> <span class="fn">remember</span> {
+    <span class="fn">mutableStateOf</span>(<span class="num">0</span>)
+}
+
+<span class="fn">Button</span>(onClick = { cliques++ }) {
+    <span class="fn">Text</span>(<span class="s">"Cliques: </span>$cliques<span class="s">"</span>)
+}</pre>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 2 — Dando vida à tela</span><span>14</span></div>
+    </section>
+
+    <!-- ========== 15 · REAGIR A EVENTOS ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 2 · interação</div>
+            <h2 class="headline reveal d2">Reagir a um clique</h2>
+            <div class="flow reveal d3">
+                <span class="node">usuário toca no botão</span><span class="arrow">→</span>
+                <span class="node acc">o estado muda</span><span class="arrow">→</span>
+                <span class="node">o Compose recompõe</span><span class="arrow">→</span>
+                <span class="node">tela atualizada</span>
+            </div>
+            <p class="lead reveal d5" style="margin-top:44px;">No quiz: tocar numa casa → confere se acertou → soma no placar → vai para a próxima rodada.</p>
+        </div>
+        <div class="foot"><span>Dia 2 — Dando vida à tela</span><span>15</span></div>
+    </section>
+
+    <!-- ========== 16 · DADOS DA INTERNET ========== -->
+    <section class="slide">
+        <div class="pad">
+            <div class="eyebrow reveal d1">dia 2 · dados</div>
+            <h2 class="headline reveal d2">Buscar dados da internet</h2>
+            <p class="lead reveal d3">O personagem de cada rodada vem de uma <b>API pública</b> — um endereço na web que devolve dados.</p>
+            <div class="cards c3">
+                <div class="card reveal d3">
+                    <span class="tag">API REST</span>
+                    <h3>A fonte</h3>
+                    <p>Um endereço que responde com os dados do personagem em formato <b>JSON</b> (texto estruturado).</p>
+                </div>
+                <div class="card reveal d4">
+                    <span class="tag">Retrofit + Gson</span>
+                    <h3>A ponte</h3>
+                    <p>Fazem a chamada e transformam o JSON num <b>objeto Kotlin</b> que a tela consegue usar.</p>
+                </div>
+                <div class="card reveal d5">
+                    <span class="tag">Coil</span>
+                    <h3>A imagem</h3>
+                    <p>Baixa e mostra a <b>foto</b> do personagem a partir do link, com cache.</p>
+                </div>
+            </div>
+            <p class="lead reveal d6" style="font-size:25px;margin-top:26px;">Isso demora um tico → roda em <b>segundo plano</b> pra não travar a tela.</p>
+        </div>
+        <div class="foot"><span>Dia 2 — Dando vida à tela</span><span>16</span></div>
+    </section>
+
+    <!-- ========== 17 · NAVEGAÇÃO ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">dia 2 · várias telas</div>
+            <h2 class="headline reveal d2">Navegar entre telas</h2>
+            <div class="two">
+                <ul class="points" style="margin-top:0;">
+                    <li class="reveal d3">Cada tela tem um <b>nome</b> (rota): <span class="muted">"quiz"</span>, <span class="muted">"resultado"</span>.</li>
+                    <li class="reveal d4">Um <b>NavHost</b> lista as telas; pedir pra navegar troca de uma pra outra.</li>
+                    <li class="reveal d5">Dá pra <b>passar dados</b> na troca — por exemplo, o placar final.</li>
+                </ul>
+                <div class="vflow reveal d4">
+                    <span class="node acc">Tela do quiz</span>
+                    <span class="step">↓ &nbsp;fim das 5 rodadas</span>
+                    <span class="node acc">Tela de resultado</span>
+                    <span class="step">↓ &nbsp;"jogar novamente"</span>
+                    <span class="node">volta pro início</span>
+                </div>
+            </div>
+        </div>
+        <div class="foot"><span>Dia 2 — Dando vida à tela</span><span>17</span></div>
+    </section>
+
+    <!-- ========== 18 · O QUIZ INTEIRO ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">juntando tudo</div>
+            <h2 class="headline reveal d2">O Hogwarts Quiz, de ponta a ponta</h2>
+            <div class="flow reveal d3">
+                <span class="node acc">abre a tela do quiz</span><span class="arrow">→</span>
+                <span class="node api">busca um personagem na API</span><span class="arrow">→</span>
+                <span class="node">mostra foto e nome</span>
+            </div>
+            <div class="flow reveal d4">
+                <span class="node">você escolhe a casa</span><span class="arrow">→</span>
+                <span class="node">confere e soma o placar</span><span class="arrow">→</span>
+                <span class="node acc">repete 5×</span>
+            </div>
+            <div class="flow reveal d5">
+                <span class="node">acabaram as rodadas</span><span class="arrow">→</span>
+                <span class="node acc">tela de resultado</span><span class="arrow">→</span>
+                <span class="node">"jogar novamente" volta ao início</span>
+            </div>
+            <p class="lead reveal d6" style="margin-top:44px;">Cada peça que a gente viu nos 2 dias, conectada.</p>
+        </div>
+        <div class="foot"><span>Hogwarts Quiz</span><span>18</span></div>
+    </section>
+
+    <!-- ========== 19 · PRÓXIMOS PASSOS ========== -->
+    <section class="slide">
+        <div class="pad center">
+            <div class="eyebrow reveal d1">para continuar</div>
+            <h2 class="headline reveal d2">Próximos passos <span class="wand">✦</span></h2>
+            <div class="two">
+                <ul class="points" style="margin-top:0;">
+                    <li class="reveal d3">Guardar dados no celular com <b>Room</b> e <b>SQLite</b>.</li>
+                    <li class="reveal d4">Tela de <b>carregando</b> e aviso de erro de rede.</li>
+                    <li class="reveal d5"><b>Animações</b> entre as rodadas.</li>
+                    <li class="reveal d6">Fazer o quiz com <b>outros valores</b>: apelido, dia que nasceu, ator, etc.</li>
+                </ul>
+                <div class="card reveal d4" style="gap:14px;">
+                    <span class="tag">recursos</span>
+                    <p style="font-size:23px;line-height:1.7;">
+                        developer.android.com/courses<br>
+                        developer.android.com/jetpack/compose<br>
+                        kotlinlang.org/docs<br>
+                        github.com/android/nowinandroid
+                    </p>
+                </div>
+            </div>
+            <div class="reveal d6" style="margin-top:56px;font-family:var(--font-display);font-weight:800;font-size:56px;">
+                Obrigado! <span class="accent">Bora codar.</span>
+            </div>
+        </div>
+        <div class="foot"><span>Hogwarts Quiz · Mini-curso Android</span><span>19</span></div>
+    </section>
+
+</main>
+</div>
+
+<!-- edição inline -->
+<div class="edit-hotzone" id="editHotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Modo edição (E)">✏️ editar</button>
+<button class="edit-save" id="editSave">⬇ salvar .html</button>
+
+<script>
+/* ===========================================
+   CONTROLADOR DA APRESENTAÇÃO
+   escala o palco 1920x1080 · navegação teclado/toque/roda · deep-link #s7
+   =========================================== */
+class SlidePresentation{
+    constructor(){
+        this.slides=[...document.querySelectorAll('.slide')];
+        this.i=0;
+        this.stage=document.getElementById('deckStage');
+        this.scaleStage();
+        window.addEventListener('resize',()=>this.scaleStage());
+        this.bindKeys();
+        this.bindTouch();
+        this.bindWheel();
+        const fromHash=parseInt((location.hash||'').replace(/\D/g,''),10);
+        this.show(Number.isFinite(fromHash)&&fromHash>0?fromHash-1:0);
+        window.addEventListener('hashchange',()=>{
+            const n=parseInt((location.hash||'').replace(/\D/g,''),10);
+            if(Number.isFinite(n))this.show(n-1);
+        });
+    }
+    scaleStage(){
+        const f=Math.min(window.innerWidth/1920,window.innerHeight/1080);
+        const x=(window.innerWidth-1920*f)/2;
+        const y=(window.innerHeight-1080*f)/2;
+        this.stage.style.transform=`translate(${x}px, ${y}px) scale(${f})`;
+    }
+    show(n){
+        this.i=Math.max(0,Math.min(n,this.slides.length-1));
+        this.slides.forEach((s,k)=>{
+            s.classList.toggle('active',k===this.i);
+            s.classList.toggle('visible',k===this.i);
+        });
+        if(history.replaceState)history.replaceState(null,'','#s'+(this.i+1));
+    }
+    next(){this.show(this.i+1);}
+    prev(){this.show(this.i-1);}
+    bindKeys(){
+        document.addEventListener('keydown',e=>{
+            if(document.body.classList.contains('editing')&&e.target.isContentEditable)return;
+            if(['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){e.preventDefault();this.next();}
+            if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();this.prev();}
+            if(e.key==='Home')this.show(0);
+            if(e.key==='End')this.show(this.slides.length-1);
+        });
+    }
+    bindTouch(){
+        let x0=null;
+        addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+        addEventListener('touchend',e=>{
+            if(x0===null)return;
+            const dx=e.changedTouches[0].clientX-x0;
+            if(Math.abs(dx)>60){dx<0?this.next():this.prev();}
+            x0=null;
+        },{passive:true});
+    }
+    bindWheel(){
+        let lock=false;
+        addEventListener('wheel',e=>{
+            if(document.body.classList.contains('editing'))return;
+            if(lock)return;
+            if(Math.abs(e.deltaY)<24)return;
+            lock=true;setTimeout(()=>lock=false,500);
+            e.deltaY>0?this.next():this.prev();
+        },{passive:true});
+    }
+}
+const deck=new SlidePresentation();
+
+/* ===========================================
+   EDIÇÃO INLINE — hotzone canto sup. esquerdo, ou tecla E
+   salva em localStorage e exporta o .html editado
+   =========================================== */
+const editor={
+    isActive:false,
+    editables:[
+        'h1.headline','h2.headline','.lead','.eyebrow','ul.points li',
+        '.card p','.card h3','.card .tag','.title-sub','.badge',
+        '.chips span','.big','.sub','.day','.foot span','.layer span','.node'
+    ],
+    key(){return 'hpquiz-deck::v2::'+location.pathname;},
+    toggle(){
+        this.isActive=!this.isActive;
+        document.body.classList.toggle('editing',this.isActive);
+        document.getElementById('editToggle').classList.toggle('active',this.isActive);
+        document.querySelectorAll(this.editables.join(',')).forEach(el=>{el.contentEditable=this.isActive;});
+        if(!this.isActive)this.save();
+    },
+    save(){
+        try{
+            const data={};
+            document.querySelectorAll('.slide').forEach((s,i)=>{data[i]=s.innerHTML;});
+            localStorage.setItem(this.key(),JSON.stringify(data));
+        }catch(e){}
+    },
+    restore(){
+        try{
+            const raw=localStorage.getItem(this.key());
+            if(!raw)return;
+            const data=JSON.parse(raw);
+            document.querySelectorAll('.slide').forEach((s,i)=>{if(data[i]!=null)s.innerHTML=data[i];});
+        }catch(e){}
+    },
+    exportFile(){
+        this.save();
+        const clone=document.documentElement.cloneNode(true);
+        clone.querySelectorAll('[contenteditable]').forEach(el=>el.removeAttribute('contenteditable'));
+        clone.querySelector('body').classList.remove('editing');
+        const blob=new Blob(['<!DOCTYPE html>\n'+clone.outerHTML],{type:'text/html'});
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='curso-android-slides.html';
+        a.click();
+    }
+};
+editor.restore();
+
+const hotzone=document.getElementById('editHotzone');
+const editToggle=document.getElementById('editToggle');
+let hideT=null;
+hotzone.addEventListener('mouseenter',()=>{clearTimeout(hideT);editToggle.classList.add('show');});
+hotzone.addEventListener('mouseleave',()=>{hideT=setTimeout(()=>{if(!editor.isActive)editToggle.classList.remove('show');},400);});
+editToggle.addEventListener('mouseenter',()=>clearTimeout(hideT));
+editToggle.addEventListener('mouseleave',()=>{hideT=setTimeout(()=>{if(!editor.isActive)editToggle.classList.remove('show');},400);});
+editToggle.addEventListener('click',()=>editor.toggle());
+hotzone.addEventListener('click',()=>editor.toggle());
+document.getElementById('editSave').addEventListener('click',()=>editor.exportFile());
+document.addEventListener('keydown',e=>{
+    if((e.key==='e'||e.key==='E')&&!(e.target.isContentEditable))editor.toggle();
+    if(editor.isActive&&(e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();editor.exportFile();}
+});
+</script>
+</body>
+</html>
